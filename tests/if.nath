@@ -1,0 +1,10 @@
+x = 14
+
+if x == 1 { print x+1 }
+
+else {
+    print x
+}
+x = 12
+print x
+

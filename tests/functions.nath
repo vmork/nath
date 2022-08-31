@@ -1,0 +1,6 @@
+f = () -> {
+    while false { print 1 }
+    print 2
+}
+
+print f(10)
