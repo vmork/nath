@@ -1,5 +1,6 @@
 from typing import Any, Tuple
 import math
+from copy import deepcopy
 
 from src.environment import Environment, MISSING
 import src.ast_nodes as ast
@@ -12,14 +13,15 @@ from src import nath_builtins
 class Interpreter(Visitor):
     def __init__(self, in_repl=False):
         self.in_repl = in_repl
-        self.env = Environment()
+        self.global_scope = Environment()
+        self.env = self.global_scope
 
         # add builtin functions to global scope
         for name, arity in nath_builtins.functions: 
             func = NathCallable()
             func.arity = arity
             func.call = getattr(nath_builtins, f"_{name}")
-            self.env.global_scope.assign_name(name, func)
+            self.global_scope.define(name, func)
 
     ### API entry point
     def interpret(self, statements: list[Tuple[int, ast.AstNode]]) -> None:
@@ -74,20 +76,29 @@ class Interpreter(Visitor):
     ### Visitor methods ---------------------------------------------------------------
 
     def visit_Block(self, block: ast.Block) -> None:
-        for stmt in block.statements: 
-            self.evaluate(stmt)
-    
+        self.execute_block(block, block_env=self.env)
+
+    def execute_block(self, block, block_env):
+        prev_env = self.env
+        try:
+            self.env = block_env
+            for stmt in block.statements: 
+                self.evaluate(stmt)
+        finally:
+            self.env = prev_env
+
     def visit_EachStatement(self, stmt: ast.EachStatement) -> None:
         iterable = self.evaluate(stmt.iterable)
-        if not isinstance(iterable, range): # add more allowed iterables later
+        if not isinstance(iterable, list): # TODO: add more allowed iterables later
             raise NathRuntimeError(-69, f"Can't loop over object of type '{type(iterable).__name__}'")
 
-        self.env.new_scope()
+        loop_varname_scope = Environment(parent=self.env.parent)
+        self.env.parent = loop_varname_scope
         for elem in iterable:
             if stmt.var_name:
-                self.env.local_scope.assign(stmt.var_name, elem)
+                loop_varname_scope.define(stmt.var_name.lexeme, elem)
             self.evaluate(stmt.body)
-        self.env.destroy_scope()
+        self.env.parent = self.env.parent.parent
     
     def visit_WhileStatement(self, stmt: ast.WhileStatement):
         while self.is_truthy(self.evaluate(stmt.condition)):
@@ -111,7 +122,7 @@ class Interpreter(Visitor):
         lhs = self.env.get_or_MISSING(var)
         if lhs is MISSING and stmt.operator.type != tt.EQUAL:
             raise NathRuntimeError(stmt.operator, 
-            f"{stmt.operator.lexeme} on undefined variable {var.lexeme}")
+            f"'{stmt.operator.lexeme}' on undefined variable {var.lexeme}")
 
         rhs = self.evaluate(stmt.value)
         match(stmt.operator.type):
@@ -122,10 +133,10 @@ class Interpreter(Visitor):
             case tt.SLASH_EQUAL: value = lhs / rhs
             case tt.CARET_EQUAL: value = lhs ** rhs
         
-        self.env.local_scope.assign(var, value)
+        self.env.assign_or_define(var.lexeme, value)
     
     def visit_FunctionDefinition(self, expr: ast.FunctionDefinition):
-        return NathFunction(interpreter=self, definition=expr)
+        return NathFunction(interpreter=self, definition=expr, closure=self.env)
     
     def visit_FunctionCall(self, expr: ast.FunctionCall):
         callee = self.evaluate(expr.callee)
@@ -148,7 +159,7 @@ class Interpreter(Visitor):
         args = [self.assert_int_like(self.evaluate(x)) for x in args]
         if any([x is None for x in args]):
             raise NathRuntimeError(-69, "Arguments to range constructor low..high..step must be integers")
-        return range(args[0], args[1]+1, args[2])
+        return [float(x) for x in range(args[0], args[1]+1, args[2])]
             
     def visit_Variable(self, var: ast.Variable):
         return self.env.get_or_error(var.name)

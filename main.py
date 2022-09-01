@@ -38,7 +38,7 @@ class NathRuntime():
             report_error(e)
             return 65
         try: ### interpret
-            print('bindings:', self.interpreter.env.local_scope.dict, '\n')
+            print('bindings:', self.interpreter.env.dict, '\n')
             self.interpreter.interpret(statements)
         except NathRuntimeError as e:
             report_error(e)

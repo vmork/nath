@@ -18,7 +18,6 @@ class Parser():
         while not self.is_at_end():
             self.line_num += 1
             statements.append((self.statement(), self.line_num))
-            self.consume_newlines()
             self.match([tt.EOF])
         return statements
     
@@ -55,11 +54,12 @@ class Parser():
         return False
     
     def consume_newlines(self):
-        while self.match([tt.NEWLINE], consume=False): 
-            self.advance() # ignore empty lines
+        while self.match([tt.NEWLINE]): pass # ignore empty lines
     
     ### Recursive descent methods
     def statement(self):
+        self.consume_newlines()
+
         if self.match([tt.PRINT]):
             stmt = self.print_statement()
         elif self.match([tt.LEFT_BRACE]):
@@ -83,10 +83,10 @@ class Parser():
             self.has_to_match([tt.NEWLINE, tt.EOF, tt.SEMICOLON], 
                 f"Excpected end of statement (newline or ';'), but got {self.peek().lexeme}")
 
+        self.consume_newlines()
         return stmt
     
     def block(self):
-        self.consume_newlines() # ignore initial newlines
         statements = []
         while not (self.is_at_end() or self.peek().istype(tt.RIGHT_BRACE)):
             statements.append(self.statement())

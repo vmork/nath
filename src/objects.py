@@ -1,4 +1,5 @@
 from src.ast_nodes import FunctionDefinition
+from src.environment import Environment
 
 class Return(Exception):
     def __init__(self, value):
@@ -8,20 +9,24 @@ class Return(Exception):
 class NathCallable(): pass
 
 class NathFunction(NathCallable):
-    def __init__(self, interpreter, definition: FunctionDefinition):
+    def __init__(self, interpreter, definition: FunctionDefinition, closure: Environment):
         self.interpreter = interpreter
         self.definition = definition
+        self.closure = closure
         self.arity = len(definition.parameters)
 
     def call(self, *arguments):
-        self.interpreter.env.new_scope()
+        #print("in call,", arguments)
+        env = Environment(parent=self.closure)
         for param, arg in zip(self.definition.parameters, arguments):
-            self.interpreter.env.local_scope.assign(param, arg)
+            env.define(param.lexeme, arg)
+            
+        #print("environment:", env.dict, "parent:", env.parent.dict)
 
         try: 
-            self.interpreter.evaluate(self.definition.body)
+            self.interpreter.execute_block(self.definition.body, env)
         except Return as r:
             return r.value
-            
-        self.interpreter.env.destroy_scope()
-        return None
+
+    def __repr__(self):
+        return f"<function>"

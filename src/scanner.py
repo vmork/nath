@@ -53,12 +53,7 @@ class Scanner():
 
             case _:
                 raise NathSyntaxError(self.line, f"Invalid character: {c}")
-    
-    def ignore_newlines(self):
-        while self.peek() == '\n':
-            self.line += 1
-            self.advance()
-    
+        
     def handle_string(self):
         while self.peek() != '"' and not self.is_at_end():
             if self.peek() == '\n': self.line += 1

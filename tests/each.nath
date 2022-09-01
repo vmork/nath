@@ -1,6 +1,9 @@
 each x of 0..10..2 {
     print x
+    y = 123
 } 
+
+# print x
 
 ### fibbonacci ###
 a = 1; b = 1
