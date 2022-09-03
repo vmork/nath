@@ -1,18 +1,8 @@
 {
-    a = 1
-    b = 2
-    c = 3
+    a = "outer"
     {
-        a = 42
+        a = "inner"
         print a
-        print b
-        print c
-        {
-            b = 100
-            print a
-            print b
-            print "c"
-        }
-        print b
     }
+    print a
 }

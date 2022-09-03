@@ -1,6 +1,3 @@
-from ast import arguments
-from typing import Tuple
-
 from src.errors import NathSyntaxError
 import src.ast_nodes as ast
 from src.tokens import Token, TokenType as tt
@@ -78,7 +75,7 @@ class Parser():
             stmt = self.continue_statement()
         else:
             stmt = self.assignment_or_expression_statement()
-
+        
         if not self.peek().type in [tt.RIGHT_BRACE]:
             self.has_to_match([tt.NEWLINE, tt.EOF, tt.SEMICOLON], 
                 f"Excpected end of statement (newline or ';'), but got {self.peek().lexeme}")
@@ -153,27 +150,34 @@ class Parser():
     def expression(self):
         return self.function_definition()
     
-    def function_definition(self):
+    def function_definition(self): # TODO: separate into param_list(), tt.ARROW, fn_body()
         param_list = []
-        paren = self.match([tt.LEFT_PAREN])
+        left_paren = self.match([tt.LEFT_PAREN])
         if var := self.match([tt.IDENTIFIER]):
             param_list.append(var)
             while self.match([tt.COMMA]):
                 if var := self.match([tt.IDENTIFIER]): param_list.append(var)
                 else: raise NathSyntaxError(self.peek(), "Trailing comma in parameter list")
-                    
-            if paren: self.match([tt.RIGHT_PAREN])
+
+            if left_paren: 
+                right_paren = self.match([tt.RIGHT_PAREN])
                 
             if self.match([tt.ARROW]):
-                return self.finish_function_definition(param_list)
+                expr = self.finish_function_definition(param_list)
+                if left_paren and right_paren is None: 
+                    expr = ast.Grouping(expr)
+                    self.match([tt.RIGHT_PAREN])
+                return expr
             elif len(param_list) == 1:
-                if paren: self.current -= 2
+                if left_paren: 
+                    if right_paren: self.current -= 3
+                    else: self.current -= 2
                 else: self.current -= 1
                 return self.range_expression()
             else:
                 raise NathSyntaxError(var, "Expected '->' after argument list")
 
-        elif paren:
+        elif left_paren:
             if self.match([tt.RIGHT_PAREN]) and self.match([tt.ARROW]):
                 return self.finish_function_definition(param_list)
             else: self.current -= 1

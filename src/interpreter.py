@@ -75,10 +75,9 @@ class Interpreter(Visitor):
 
     ### Visitor methods ---------------------------------------------------------------
 
-    def visit_Block(self, block: ast.Block) -> None:
-        self.execute_block(block, block_env=self.env)
+    def visit_Block(self, block: ast.Block, block_env=None) -> None:
+        if block_env is None: block_env = self.env
 
-    def execute_block(self, block, block_env):
         prev_env = self.env
         try:
             self.env = block_env
@@ -89,7 +88,7 @@ class Interpreter(Visitor):
 
     def visit_EachStatement(self, stmt: ast.EachStatement) -> None:
         iterable = self.evaluate(stmt.iterable)
-        if not isinstance(iterable, list): # TODO: add more allowed iterables later
+        if not isinstance(iterable, (list, str)):
             raise NathRuntimeError(-69, f"Can't loop over object of type '{type(iterable).__name__}'")
 
         loop_varname_scope = Environment(parent=self.env.parent)

@@ -20,11 +20,11 @@ class NathFunction(NathCallable):
         env = Environment(parent=self.closure)
         for param, arg in zip(self.definition.parameters, arguments):
             env.define(param.lexeme, arg)
-            
+
         #print("environment:", env.dict, "parent:", env.parent.dict)
 
         try: 
-            self.interpreter.execute_block(self.definition.body, env)
+            self.interpreter.evaluate(self.definition.body, block_env=env)
         except Return as r:
             return r.value
 

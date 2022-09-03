@@ -15,3 +15,7 @@ each 0..100 {
     print b
 }
 
+each c of "abcd" {
+    print c
+}
+

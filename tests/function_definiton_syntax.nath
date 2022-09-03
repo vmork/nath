@@ -1,0 +1,9 @@
+f = (x -> 2x+1)
+g = x -> x^2
+# h = x, y, z -> { return x+y+z }
+i = ((((x,y) -> x-y)))
+
+print f(1)
+print g(2)
+print h(3, 1, 2)
+print i(7, 44)

@@ -1,0 +1,20 @@
+f = () -> {
+    a = 1
+    g = () -> {
+        a += 1
+        return a
+    }
+    return g
+}
+
+f()
+# print a ###error
+
+print f()()
+
+global = 1
+fun = () -> {
+    global = 21
+}
+fun()
+print global
