@@ -6,6 +6,8 @@ class Return(Exception):
         super().__init__()
         self.value = value
 
+class Break(Exception): pass
+
 class NathCallable(): pass
 
 class NathFunction(NathCallable):

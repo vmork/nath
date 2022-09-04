@@ -16,6 +16,7 @@ each 0..100 {
 }
 
 each c of "abcd" {
+    if c == "d" { break }
     print c
 }
 

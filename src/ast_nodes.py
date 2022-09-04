@@ -71,3 +71,6 @@ class FunctionDefinition(AstNode):
 @dataclass
 class ReturnStatement(AstNode):
     value: AstNode
+@dataclass
+class BreakStatement(AstNode):
+    pass

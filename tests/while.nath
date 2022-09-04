@@ -9,9 +9,10 @@ while x < 5 {
 
 print y
 
-while not true {
+while true {
     print "Hello"
     x = 1
+    break
 }
 
 print x

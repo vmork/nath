@@ -12,6 +12,8 @@ class Parser():
         self.current = 0
         statements = []
         self.line_num = 0
+        self.inside_function_body = False
+        self.inside_each_or_while = False
         while not self.is_at_end():
             self.line_num += 1
             statements.append((self.statement(), self.line_num))
@@ -100,7 +102,9 @@ class Parser():
         else: var_name, iterable = None, var_name
         
         self.has_to_match([tt.LEFT_BRACE], "Excpected '{ after each-statement")
+        self.inside_each_or_while = True
         body = self.block()
+        self.inside_each_or_while = False
         return ast.EachStatement(var_name, iterable, body)
     
     def if_statement(self):
@@ -125,7 +129,10 @@ class Parser():
     def while_statement(self):
         condition = self.expression()
         self.has_to_match([tt.LEFT_BRACE], "Excpected '{' after while-statement")
-        return ast.WhileStatement(condition, self.block())
+        self.inside_each_or_while = True
+        body = self.block()
+        self.inside_each_or_while = False
+        return ast.WhileStatement(condition, body)
             
     def print_statement(self):        
         return ast.PrintStatement(self.expression())
@@ -143,9 +150,16 @@ class Parser():
         return ast.AssignmentStatement(expr.name, operator, value)
     
     def return_statement(self):
+        if not self.inside_function_body:
+            raise NathSyntaxError(self.peek(), "Return statement outside of function body")
         if self.match([tt.NEWLINE, tt.SEMICOLON, tt.EOF], consume=False): value = None
         else: value = self.expression()
         return ast.ReturnStatement(value)
+    
+    def break_statement(self):
+        if not self.inside_each_or_while:
+            raise NathSyntaxError(self.peek(), "Break statement outside each or while loop")
+        return ast.BreakStatement()
     
     def expression(self):
         return self.function_definition()
@@ -163,7 +177,9 @@ class Parser():
                 right_paren = self.match([tt.RIGHT_PAREN])
                 
             if self.match([tt.ARROW]):
+                self.inside_function_body = True
                 expr = self.finish_function_definition(param_list)
+                self.inside_function_body = False
                 if left_paren and right_paren is None: 
                     expr = ast.Grouping(expr)
                     self.match([tt.RIGHT_PAREN])

@@ -4,7 +4,7 @@ from src.tokens import Token, TokenType as tt, lexeme_to_token
 one_char_lexemes = ["(", ")", "[", "]", "{", "}", ";", ","]
 one_or_two_char_lexemes = ["+", "-", "-", "*", "/", "=", "!", "<", ">", "^", "."]
 keywords = ["and", "or", "if", "else", "elseif", "true", "false", "for", "null", 
-    "print", "return", "in", "not", "each", "while", "of"]
+    "print", "return", "in", "not", "each", "while", "of", "break"]
 
 class Scanner():
     def __init__(self, source):

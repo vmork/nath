@@ -1,13 +1,12 @@
 from typing import Any, Tuple
 import math
-from copy import deepcopy
 
 from src.environment import Environment, MISSING
 import src.ast_nodes as ast
 from src.tokens import Token, TokenType as tt
 from src.errors import NathRuntimeError
 from src.visitor import Visitor, Visitee
-from src.objects import NathCallable, NathFunction, Return
+from src.objects import NathCallable, NathFunction, Return, Break
 from src import nath_builtins
 
 class Interpreter(Visitor):
@@ -74,7 +73,6 @@ class Interpreter(Visitor):
 
 
     ### Visitor methods ---------------------------------------------------------------
-
     def visit_Block(self, block: ast.Block, block_env=None) -> None:
         if block_env is None: block_env = self.env
 
@@ -93,15 +91,20 @@ class Interpreter(Visitor):
 
         loop_varname_scope = Environment(parent=self.env.parent)
         self.env.parent = loop_varname_scope
-        for elem in iterable:
-            if stmt.var_name:
-                loop_varname_scope.define(stmt.var_name.lexeme, elem)
-            self.evaluate(stmt.body)
-        self.env.parent = self.env.parent.parent
+        try:
+            for elem in iterable:
+                if stmt.var_name:
+                    loop_varname_scope.define(stmt.var_name.lexeme, elem)
+                self.evaluate(stmt.body)
+        except Break: pass
+        finally:
+            self.env.parent = self.env.parent.parent
     
     def visit_WhileStatement(self, stmt: ast.WhileStatement):
-        while self.is_truthy(self.evaluate(stmt.condition)):
-            self.evaluate(stmt.body)
+        try:
+            while self.is_truthy(self.evaluate(stmt.condition)):
+                self.evaluate(stmt.body)
+        except Break: pass
     
     def visit_IfStatement(self, stmt: ast.IfStatement) -> None:
         if self.is_truthy(self.evaluate(stmt.condition)):
@@ -153,6 +156,9 @@ class Interpreter(Visitor):
         else: value = None
         raise Return(value)
     
+    def visit_BreakStatement(self, stmt: ast.BreakStatement):
+        raise Break()
+    
     def visit_Range(self, r: ast.Range):
         args = [r.low, r.high, r.step]
         args = [self.assert_int_like(self.evaluate(x)) for x in args]
@@ -167,7 +173,7 @@ class Interpreter(Visitor):
         return expr.value
 
     def visit_Grouping(self, expr: ast.Grouping):
-        return self.visit(expr.expression) # recursively evaluate the expression inside the parentheses
+        return self.visit(expr.expression)
 
     def visit_Unary(self, expr: ast.Unary):
         expr_val = self.evaluate(expr.expression)
