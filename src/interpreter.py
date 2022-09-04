@@ -6,7 +6,7 @@ import src.ast_nodes as ast
 from src.tokens import Token, TokenType as tt
 from src.errors import NathRuntimeError
 from src.visitor import Visitor, Visitee
-from src.objects import NathCallable, NathFunction, Return, Break
+from src.objects import NathFunction, Return, Break
 from src import nath_builtins
 
 class Interpreter(Visitor):
@@ -17,7 +17,7 @@ class Interpreter(Visitor):
 
         # add builtin functions to global scope
         for name, arity in nath_builtins.functions: 
-            func = NathCallable()
+            func = NathFunction(name=name)
             func.arity = arity
             func.call = getattr(nath_builtins, f"_{name}")
             self.global_scope.define(name, func)
@@ -71,6 +71,33 @@ class Interpreter(Visitor):
             if not self.is_truthy(left): return left
         return self.evaluate(expr.right)
 
+    # Arithmetic
+    def do_add(self, left, right, opnode):
+        if type(left) != type(right): # cant add strings and numbers
+            raise NathRuntimeError(opnode, 
+            "Operands to + must be of the same type, " + 
+            f"but have types {[type(left).__name__, type(right).__name__]}")
+        self.assert_types(opnode, [left, right], [float, str])
+        return left + right
+
+    def do_sub(self, left, right, opnode):
+        self.assert_types(opnode, [left, right], [float])
+        return left - right
+
+    def do_mul(self, left, right, opnode):
+        self.assert_types(opnode, [left, right], [float])
+        return left * right
+        
+    def do_div(self, left, right, opnode):
+        self.assert_types(opnode, [left, right], [float])
+        if right == 0:
+            raise NathRuntimeError(opnode, "Division by zero")
+        return left / right
+
+    def do_pow(self, left, right, opnode):
+        self.assert_types(opnode, [left, right], [float])
+        return left ** right
+
 
     ### Visitor methods ---------------------------------------------------------------
     def visit_Block(self, block: ast.Block, block_env=None) -> None:
@@ -120,29 +147,39 @@ class Interpreter(Visitor):
         if self.in_repl: print(self.stringify(result))
     
     def visit_AssignmentStatement(self, stmt: ast.AssignmentStatement) -> None:
+        if stmt.operator.type != tt.EQUAL:
+            return self.augmented_assignment(stmt)
+
+        var = stmt.name
+        rhs = self.evaluate(stmt.value)
+        if isinstance(rhs, NathFunction): rhs.name = var.lexeme
+        self.env.assign_or_define(var.lexeme, rhs)
+    
+    def augmented_assignment(self, stmt: ast.AssignmentStatement):
         var = stmt.name
         lhs = self.env.get_or_MISSING(var)
-        if lhs is MISSING and stmt.operator.type != tt.EQUAL:
+        if lhs is MISSING and stmt.operator.type:
             raise NathRuntimeError(stmt.operator, 
             f"'{stmt.operator.lexeme}' on undefined variable {var.lexeme}")
-
-        rhs = self.evaluate(stmt.value)
-        match(stmt.operator.type):
-            case tt.EQUAL: value = rhs
-            case tt.PLUS_EQUAL: value = lhs + rhs
-            case tt.MINUS_EQUAL: value = lhs - rhs
-            case tt.STAR_EQUAL: value = lhs * rhs
-            case tt.SLASH_EQUAL: value = lhs / rhs
-            case tt.CARET_EQUAL: value = lhs ** rhs
         
+        rhs = self.evaluate(stmt.value)
+        ops = {
+            tt.PLUS_EQUAL: self.do_add,
+            tt.MINUS_EQUAL: self.do_sub,
+            tt.STAR_EQUAL: self.do_mul,
+            tt.SLASH_EQUAL: self.do_div,
+            tt.CARET_EQUAL: self.do_pow,
+        }
+
+        value = ops[stmt.operator.type](lhs, rhs, stmt.operator)
         self.env.assign_or_define(var.lexeme, value)
-    
+
     def visit_FunctionDefinition(self, expr: ast.FunctionDefinition):
         return NathFunction(interpreter=self, definition=expr, closure=self.env)
     
     def visit_FunctionCall(self, expr: ast.FunctionCall):
         callee = self.evaluate(expr.callee)
-        if not isinstance(callee, NathCallable):
+        if not isinstance(callee, NathFunction):
             raise NathRuntimeError(-69, f"{type(callee).__name__} is not callable")
 
         arguments = [self.evaluate(arg) for arg in expr.arguments]
@@ -199,32 +236,15 @@ class Interpreter(Visitor):
             return self.logical_binary(expr)
         left = self.evaluate(expr.left)
         right = self.evaluate(expr.right)
+
         match(expr.operator.type):
-            case tt.PLUS: 
-                if type(left) != type(right): # cant add strings and numbers
-                    raise NathRuntimeError(expr.operator, 
-                    "Operands to + must be of the same type, " + 
-                    f"but have types {[type(left).__name__, type(right).__name__]}")
-                self.assert_types(expr.operator, [left, right], [float, str])
-                return left + right
-            case tt.MINUS: 
-                self.assert_types(expr.operator, [left, right], [float])
-                return left - right
-            case tt.STAR: 
-                self.assert_types(expr.operator, [left, right], [float])
-                return left * right
-            case tt.SLASH: 
-                self.assert_types(expr.operator, [left, right], [float])
-                if right == 0:
-                    raise NathRuntimeError(expr.operator, "Division by zero")
-                return left / right
-            case tt.CARET:
-                self.assert_types(expr.operator, [left, right], [float])
-                return left ** right
-            case tt.EQUAL_EQUAL: 
-                return self.is_equal(left, right)
-            case tt.BANG_EQUAL: 
-                return not self.is_equal(left, right)
+            case tt.PLUS: return self.do_add(left, right, expr.operator)
+            case tt.MINUS: return self.do_sub(left, right, expr.operator)
+            case tt.STAR: return self.do_mul(left, right, expr.operator)
+            case tt.SLASH: return self.do_div(left, right, expr.operator)
+            case tt.CARET: return self.do_pow(left, right, expr.operator)
+            case tt.EQUAL_EQUAL: return self.is_equal(left, right)
+            case tt.BANG_EQUAL: return not self.is_equal(left, right)
             case tt.GT: 
                 self.assert_types(expr.operator, [left, right], [float])
                 return left > right
@@ -237,9 +257,3 @@ class Interpreter(Visitor):
             case tt.LT_EQUAL: 
                 self.assert_types(expr.operator, [left, right], [float])
                 return left <= right
-            case tt.AND:
-                self.assert_types(expr.operator, [left, right], [bool])
-                return left and right
-            case tt.OR:
-                self.assert_types(expr.operator, [left, right], [bool])
-                return left or right

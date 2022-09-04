@@ -12,8 +12,8 @@ class Parser():
         self.current = 0
         statements = []
         self.line_num = 0
-        self.inside_function_body = False
-        self.inside_each_or_while = False
+        self.inside_function_body = 0
+        self.inside_each_or_while = 0
         while not self.is_at_end():
             self.line_num += 1
             statements.append((self.statement(), self.line_num))
@@ -102,9 +102,9 @@ class Parser():
         else: var_name, iterable = None, var_name
         
         self.has_to_match([tt.LEFT_BRACE], "Excpected '{ after each-statement")
-        self.inside_each_or_while = True
+        self.inside_each_or_while += 1
         body = self.block()
-        self.inside_each_or_while = False
+        self.inside_each_or_while += 1
         return ast.EachStatement(var_name, iterable, body)
     
     def if_statement(self):
@@ -129,9 +129,9 @@ class Parser():
     def while_statement(self):
         condition = self.expression()
         self.has_to_match([tt.LEFT_BRACE], "Excpected '{' after while-statement")
-        self.inside_each_or_while = True
+        self.inside_each_or_while += 1
         body = self.block()
-        self.inside_each_or_while = False
+        self.inside_each_or_while += 1
         return ast.WhileStatement(condition, body)
             
     def print_statement(self):        
@@ -177,9 +177,7 @@ class Parser():
                 right_paren = self.match([tt.RIGHT_PAREN])
                 
             if self.match([tt.ARROW]):
-                self.inside_function_body = True
                 expr = self.finish_function_definition(param_list)
-                self.inside_function_body = False
                 if left_paren and right_paren is None: 
                     expr = ast.Grouping(expr)
                     self.match([tt.RIGHT_PAREN])
@@ -201,8 +199,10 @@ class Parser():
         return self.range_expression()
 
     def finish_function_definition(self, param_list):
+        self.inside_function_body += 1
         if self.match([tt.LEFT_BRACE]): body = self.block()
         else: body = ast.Block([ast.ReturnStatement(self.expression())]) # implicit return stmt
+        self.inside_function_body += 1
         return ast.FunctionDefinition(param_list, body)
 
     def range_expression(self):

@@ -20,7 +20,7 @@ class NathRuntime():
         try: ### scan
             _scanner = scanner.Scanner(source)
             tokens =  _scanner.scan_tokens()
-            print('tokens:', [t.type for t in tokens])
+            # print('tokens:', [t.type for t in tokens])
         except NathSyntaxError as e:
             report_error(e)
             return 65
@@ -32,7 +32,7 @@ class NathRuntime():
                 for i, (stmt, _) in enumerate(statements):
                     print(f"{i}: {printer.print(stmt)}")
             except Exception as e:
-                print("Can't print ast,", e)
+                print("Can't print ast:", e)
             
         except NathSyntaxError as e:
             report_error(e)
